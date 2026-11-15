@@ -12,13 +12,18 @@ from mintoon import ToonSettings, create_starter_assets
 ROOT = "/Game/MinToonSmoke"
 
 
+def _cleanup_test_assets():
+    if not unreal.EditorAssetLibrary.delete_directory(ROOT):
+        raise RuntimeError(f"Could not remove smoke-test assets under {ROOT}. Inspect the Output Log.")
+
+
 class NativeAssetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if unreal.EditorAssetLibrary.does_directory_exist(ROOT):
             raise RuntimeError(f"{ROOT} already exists; choose a clean test project. Nothing was deleted.")
         # unittest runs this even if later setup fails. The directory was absent above.
-        cls.addClassCleanup(unreal.EditorAssetLibrary.delete_directory, ROOT)
+        cls.addClassCleanup(_cleanup_test_assets)
         cls.profile, cls.material, cls.instance = create_starter_assets(ROOT, ToonSettings())
 
     def test_native_types(self):

@@ -100,6 +100,7 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 실제 UE의 에셋 구조 검사는 빈 테스트 프로젝트에서 `Tests/unreal_smoke.py`를
 **Tools > Execute Python Script**로 실행한다. `/Game/MinToonSmoke`에 네이티브 에셋을
 생성한 다음 그 테스트 폴더만 정리한다. 폴더가 이미 존재하면 실행하지 않는다.
+테스트 폴더 정리에 실패하면 검사도 실패로 처리하며 성공 로그를 출력하지 않는다.
 이 스크립트는 생성 중 현재 에디터가 반환하는 컴파일 오류도 확인한다. 아직 실제 UE에서
 실행하지 않았으며, 이미지 품질이나 다른 플랫폼의 셰이더·cook 검증을 대신하지 않는다.
 
