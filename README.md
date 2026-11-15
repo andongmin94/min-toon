@@ -86,6 +86,7 @@ assets = create_starter_assets(
 | GitHub Actions | [Source checks 실행 결과](https://github.com/andongmin94/min-toon/actions/workflows/source-checks.yml); Python 소스 검사만 수행 |
 | UE 5.8 설치·시작·메뉴 실행 | 미검증: 작업 환경에 UE 없음 |
 | 네이티브 에셋 생성·셰이더 컴파일 | 미검증 |
+| 시각·cook 검증용 장면 생성 | `Tests/create_validation_scene.py` 작성; 실제 UE 실행 미검증 |
 | 캐릭터 적용·조명·Lumen·시간적 안정성 | 미검증 |
 | Cook·패키징 실행 | 미검증 |
 
@@ -104,6 +105,34 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 
 메뉴 재등록은 에디터 Python 콘솔에서 `from mintoon.menu import register_menu` 후
 `register_menu()`를 두 번 실행하고 `Create starter materials` 항목이 하나인지 확인한다.
+
+### 시각·패키징 검증용 장면
+
+`Tests/create_validation_scene.py`는 기본 도형과 조명이 있는 맵을 생성하고 보존하는
+스크립트다. 현재는 코드와 공식 API를 확인한 단계이며, 실제 UE에서 실행하지 않았다.
+생성 성공 로그는 렌더링·cook·패키징 검증 결과를 뜻하지 않는다.
+
+1. 위 설치·렌더링 설정을 적용한 빈 UE 5.8 테스트 프로젝트에서 시작한다.
+   저장하지 않은 맵이나 콘텐츠 변경은 먼저 저장하거나 폐기한다.
+2. **Tools > Execute Python Script**로 `Tests/create_validation_scene.py`를 실행한다.
+3. `/Game/MinToonValidation`에 `TP_MinToon`, `M_MinToon`, `MI_MinToon`과
+   `L_MinToonValidation` 맵을 생성한다. 기존 `/Game/MinToon`의 재질은 사용하거나 변경하지 않는다.
+4. 구와 상자의 곡면·평면 명암, 하이라이트, 바닥 그림자를 확인한다.
+   `Fill Point` 또는 `Key Directional`의 Intensity를 0으로 바꿔 단일 광원과 다중 광원을 비교한다.
+5. `Validation Camera`를 pilot하여 구도를 확인한다. 카메라는 Player 0 자동 활성화로
+   설정하며, 에디터 뷰포트도 같은 위치와 방향으로 이동한다.
+6. 맵을 저장하고 에디터 재시작 후 다시 연다. 패키징 검증에서는 테스트 프로젝트의
+   Game Default Map과 패키징 대상 맵에 `L_MinToonValidation`을 지정하고,
+   대상 플랫폼 빌드와 실행 화면을 확인한다.
+
+구성은 엔진 기본 구·상자 메시, 얇은 상자로 만든 바닥, Movable 방향광·점광원,
+카메라다. 메시의 컴포넌트에만 재질을 적용하며 엔진 메시 원본을 수정하지 않는다.
+별도 런타임 코드나 외부 에셋은 추가하지 않는다. 캐릭터·헤어·애니메이션 검증은 이 장면의 범위 밖이다.
+
+출력 폴더가 이미 있거나 저장하지 않은 맵·콘텐츠 변경이 있으면 생성 전에 중단한다.
+맵 전환이 성공한 뒤에만 민툰 에셋을 생성하고, 생성한 에셋과 맵만 저장한다.
+생성 도중 실패하면 신규 폴더에 일부 에셋이 남을 수 있다. 자동 삭제하거나 덮어쓰지 않으므로
+Output Log와 해당 테스트 폴더를 확인한다.
 
 **다음 단계는 엔진 검증이다.** 메뉴 → 에셋 생성 → 단일/다중 광원 아래 메시 적용 →
 셰이더 오류 확인 → 저장·재시작 → 해당 메시를 포함한 맵의 cook·패키징 실행을 확인한다.
@@ -135,3 +164,7 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 - [ToolMenuEntry owner](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToolMenuEntry)
 - [ToolMenuOwner](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToolMenuOwner)
 - [Unregister Owner by Name](https://dev.epicgames.com/documentation/unreal-engine/BlueprintAPI/ToolMenus/UnregisterOwnerbyName)
+- [EditorLoadingAndSavingUtils — map creation, dirty packages and saving](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/EditorLoadingAndSavingUtils)
+- [EditorActorSubsystem — scene actors](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/EditorActorSubsystem?application_version=5.8)
+- [UnrealEditorSubsystem — viewport camera](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/UnrealEditorSubsystem)
+- [CameraActor — Player 0 activation](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/CameraActor)
