@@ -1,0 +1,18 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0-dev",
+  "FriendlyName": "MinToon (민툰)",
+  "Description": "Native toon-material authoring for stock Unreal Engine 5.8. Experimental prototype.",
+  "Category": "Rendering",
+  "CreatedBy": "andongmin94",
+  "EngineVersion": "5.8.0",
+  "EnabledByDefault": false,
+  "CanContainContent": true,
+  "IsExperimentalVersion": true,
+  "Installed": false,
+  "Plugins": [
+    {"Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": ["Editor"]},
+    {"Name": "EditorScriptingUtilities", "Enabled": true, "TargetAllowList": ["Editor"]}
+  ]
+}
