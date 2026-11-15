@@ -35,6 +35,13 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(color=color), self.assertRaises(ValueError):
                 ToonSettings(base_color=color)
 
+    def test_color_input_is_copied(self):
+        color = [0.65, 0.35, 0.18]
+        settings = ToonSettings(base_color=color)
+        color[0] = -1
+        color.append(1)
+        self.assertEqual(settings.base_color, (0.65, 0.35, 0.18))
+
     def test_settings_are_immutable(self):
         with self.assertRaises(FrozenInstanceError):
             ToonSettings().roughness = 0.9

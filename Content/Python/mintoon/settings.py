@@ -19,6 +19,7 @@ class ToonSettings:
             raise ValueError("base_color must contain three linear RGB components.")
         for index, value in enumerate(self.base_color):
             _number_in_range(f"base_color[{index}]", value, 0.0, 1.0)
+        object.__setattr__(self, "base_color", tuple(self.base_color))
         _number_in_range("roughness", self.roughness, 0.0, 1.0)
         _number_in_range("specular", self.specular, 0.0, 1.0)
         _number_in_range("anisotropy", self.anisotropy, -1.0, 1.0)
