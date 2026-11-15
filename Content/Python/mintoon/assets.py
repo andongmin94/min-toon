@@ -58,8 +58,8 @@ def _scalar(material, name: str, value: float, y: int, minimum=0.0, maximum=1.0)
 def create_starter_assets(root: str, settings: ToonSettings):
     """Create three new assets and save only those assets. Existing content is untouched.
 
-    Compilation is requested, not certified successful: inspect Material Editor errors
-    and render a test mesh before treating the generated material as validated.
+    Compiler errors reported by the current editor stop instance creation and saving.
+    Rendering and target-platform cooking still require separate validation.
     """
     profile_path, material_path, instance_path = _preflight(root)
 
@@ -84,7 +84,11 @@ def create_starter_assets(root: str, settings: ToonSettings):
     _connect(_scalar(material, "Anisotropy", settings.anisotropy, 320, -1.0, 1.0), toon, "Anisotropy")
     if not LIB.connect_material_property(toon, "", unreal.MaterialProperty.MP_FRONT_MATERIAL):
         raise RuntimeError("Could not connect Toon BSDF to Front Material.")
-    LIB.recompile_material(material)
+    errors = LIB.recompile_material(material)
+    if errors:
+        raise RuntimeError(
+            f"Material compilation failed for {material_path}:\n" + "\n".join(errors)
+        )
 
     instance = _new_asset(
         instance_path, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew()
@@ -96,5 +100,5 @@ def create_starter_assets(root: str, settings: ToonSettings):
     for asset in assets:
         if not unreal.EditorAssetLibrary.save_loaded_asset(asset, only_if_is_dirty=False):
             raise RuntimeError(f"Could not save {asset.get_path_name()}.")
-    unreal.log("MinToon: created three native assets. Check shader compilation and rendering in UE.")
+    unreal.log("MinToon: created three native assets. Check rendering and target-platform cooking in UE.")
     return assets

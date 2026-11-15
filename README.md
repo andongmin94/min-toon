@@ -3,8 +3,8 @@
 **Stock Unreal. Native toon materials. No engine patches.**
 
 런처판 Unreal Engine을 수정하지 않고 사용하는 툰 캐릭터 제작 도구의 초기 소스다.
-현재 코드는 UE 5.8 및 Toon BSDF/Toon Profile API를 전제로 작성했으며,
-실제 설치 엔진과 Epic 공식 문서로 해당 버전과 API를 확인하는 작업은 남아 있다.
+현재 코드는 UE 5.8을 대상으로 작성했다. Toon BSDF/Toon Profile과 주요 Python API를
+Epic 공식 문서에서 대조했지만, 실제 설치 엔진에서의 동작 검증은 남아 있다.
 제품 이름은 **민툰 / MinToon**, 저장소 이름은 **min-toon**으로 정했다.
 MooaToon의 포크가 아니며, 해당 프로젝트의 코드·셰이더·에셋을 포함하지 않는다.
 
@@ -45,13 +45,15 @@ MooaToon의 포크가 아니며, 해당 프로젝트의 코드·셰이더·에�
    셰이더 컴파일 오류, 실제 조명 반응, 원하는 외관을 확인한다.
 6. `TP_MinToon`에서 명암/하이라이트 램프와 간접광을 조절한다.
 
-초기 소스는 UE 5.8의 Substrate Toon Shading과 Blendable GBuffer를 가정한다.
-해당 버전의 실제 지원 상태와 API는 엔진 검증 단계에서 확인해야 한다.
-5.7 이하나 5.9 Preview를 위한 호환 경로는 포함하지 않는다.
+Epic의 UE 5.8 릴리스 노트는 Substrate Toon Shading을 **Experimental** 기능이며
+Blendable GBuffer 기반이라고 명시한다. 이 문서 확인은 MinToon의 실제 실행 검증과 별개다.
+UE 5.8 이외 버전을 위한 호환 경로는 포함하지 않는다.
 
 명령 실행은 해당 세 에셋만 생성·저장한다. 기존 에셋이 하나라도 있으면 덮어쓰지 않고
 중단한다. 같은 이름의 사본을 자동 증식시키지 않는다. 실패 시 Output Log를 확인한다.
-에셋 생성 도중 네이티브 API 오류가 발생하면 일부 새 에셋이 남을 수 있다.
+부모 머티리얼 컴파일에서 오류가 반환되면 오류 내용을 알리고 인스턴스 생성과 에셋 저장을
+중단한다. 이미 생성된 프로파일·부모 머티리얼은 남을 수 있으므로 Output Log와 생성 경로를
+확인한다. 현재 에디터의 컴파일 오류 확인이 실제 외관이나 다른 플랫폼의 cook 성공을 보장하지는 않는다.
 
 프로젝트별로 별도 경로와 초기값이 필요하면 에디터 Python 콘솔에서:
 
@@ -77,8 +79,9 @@ assets = create_starter_assets(
 
 | 검증/작업 | 2026-11-15 상태 |
 | --- | --- |
-| Python 구문 검사 | 이전 로컬 검사 통과; 현재 원격 결과는 아래 Actions 링크에서 확인 |
-| 설정·경로·버전·플러그인 선언 단위 테스트 | 이전 로컬 검사 7개 통과; Unreal 동작을 검증한 것은 아님 |
+| 주요 UE 5.8 API·렌더링 전제 | Epic 공식 문서 대조; 실제 엔진 동작은 미검증 |
+| Python 구문 검사 | 현재 원격 결과는 아래 Actions 링크에서 확인 |
+| 설정·경로·버전·플러그인 선언 및 오류 처리 단위 테스트 | 순수 Python 검사; Unreal API를 모의 처리한 검사는 엔진 실행 검증이 아님 |
 | GitHub 저장소 / 초기 소스 | 공개 저장소 `andongmin94/min-toon`의 `main`에 반영 |
 | GitHub Actions | [Source checks 실행 결과](https://github.com/andongmin94/min-toon/actions/workflows/source-checks.yml); Python 소스 검사만 수행 |
 | UE 5.8 설치·시작·메뉴 실행 | 미검증: 작업 환경에 UE 없음 |
@@ -96,7 +99,11 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 실제 UE의 에셋 구조 검사는 빈 테스트 프로젝트에서 `Tests/unreal_smoke.py`를
 **Tools > Execute Python Script**로 실행한다. `/Game/MinToonSmoke`에 네이티브 에셋을
 생성한 다음 그 테스트 폴더만 정리한다. 폴더가 이미 존재하면 실행하지 않는다.
-이 검사도 이미지 품질이나 셰이더 컴파일 성공을 대신하지 않는다.
+이 스크립트는 생성 중 현재 에디터가 반환하는 컴파일 오류도 확인한다. 아직 실제 UE에서
+실행하지 않았으며, 이미지 품질이나 다른 플랫폼의 셰이더·cook 검증을 대신하지 않는다.
+
+메뉴 재등록은 에디터 Python 콘솔에서 `from mintoon.menu import register_menu` 후
+`register_menu()`를 두 번 실행하고 `Create starter materials` 항목이 하나인지 확인한다.
 
 **다음 단계는 엔진 검증이다.** 메뉴 → 에셋 생성 → 단일/다중 광원 아래 메시 적용 →
 셰이더 오류 확인 → 저장·재시작 → 해당 메시를 포함한 맵의 cook·패키징 실행을 확인한다.
@@ -113,12 +120,18 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 배포 라이선스는 아직 지정하지 않았다. 소유자가 선택하기 전 MIT/Apache 등의 라이선스를
 임의로 붙이지 않는다. 이 저장소는 Epic 엔진 소스나 다른 프로젝트의 에셋을 배포하지 않는다.
 
-초기 작성 시 기록한 참고 링크 — 대상 버전과 API의 재확인이 필요함:
+2026-11-15 Epic의 UE 5.8 문서에서 대조한 주요 API와 렌더링 전제:
 
 - [UE 5.8 release notes — Substrate NPR Shading](https://dev.epicgames.com/documentation/unreal-engine/unreal-engine-5-8-release-notes?lang=en-US)
 - [Substrate Toon BSDF C++ reference](https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/Engine/UMaterialExpressionSubstrateToon-?lang=en-US)
+- [Substrate Toon BSDF Python reference](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MaterialExpressionSubstrateToonBSDF)
+- [Toon Profile factory](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToonProfileFactory)
+- [Toon Profile asset](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToonProfile)
 - [ToonProfile / native settings](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToonProfileStruct)
 - [MaterialEditingLibrary](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MaterialEditingLibrary)
+- [RecompileMaterial — compiler error return value](https://dev.epicgames.com/documentation/unreal-engine/API/Editor/MaterialEditor/UMaterialEditingLibrary/RecompileMaterial)
 - [MaterialProperty / Front Material](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MaterialProperty.html)
 - [Python initialization from a plugin](https://dev.epicgames.com/documentation/unreal-engine/scripting-the-unreal-editor-using-python?lang=en-US)
-- [Epic Games Japan — Blendable/Adaptive GBuffer settings](https://www.docswell.com/s/EpicGamesJapan/K8N2G7-2026-04-03-230956)
+- [ToolMenuEntry owner](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToolMenuEntry)
+- [ToolMenuOwner](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/ToolMenuOwner)
+- [Unregister Owner by Name](https://dev.epicgames.com/documentation/unreal-engine/BlueprintAPI/ToolMenus/UnregisterOwnerbyName)

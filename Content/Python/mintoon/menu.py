@@ -22,7 +22,11 @@ def register_menu() -> None:
     menus.unregister_owner_by_name(OWNER)
     tools = menus.extend_menu("LevelEditor.MainMenu.Tools")
     menu = tools.add_sub_menu(OWNER, "Tools", "MinToon", "MinToon", "Native toon material authoring")
-    entry = unreal.ToolMenuEntry(name="MinToon.CreateStarter", type=unreal.MultiBlockType.MENU_ENTRY)
+    entry = unreal.ToolMenuEntry(
+        name="MinToon.CreateStarter",
+        owner=unreal.ToolMenuOwner(OWNER),
+        type=unreal.MultiBlockType.MENU_ENTRY,
+    )
     entry.set_label("Create starter materials")
     entry.set_tool_tip("Create TP_MinToon, M_MinToon and MI_MinToon in /Game/MinToon. Never overwrites.")
     entry.set_string_command(

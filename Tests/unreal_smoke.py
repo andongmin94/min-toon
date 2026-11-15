@@ -1,7 +1,8 @@
 """Run via Tools > Execute Python Script in a disposable UE 5.8 project.
 
 Creates native assets under /Game/MinToonSmoke and removes only that test folder.
-This checks asset structure, NOT rendered appearance, shader errors or packaging.
+This checks asset structure; creation also rejects compiler errors returned by
+the current editor. It does NOT validate rendered appearance or target-platform cooking.
 """
 import unittest
 import unreal
@@ -50,4 +51,4 @@ class NativeAssetTests(unittest.TestCase):
 result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(NativeAssetTests))
 if not result.wasSuccessful():
     raise RuntimeError("MinToon native asset smoke test failed. Inspect the Output Log.")
-unreal.log("MinToon native asset checks passed; visual/shader/cook validation is still separate.")
+unreal.log("MinToon native asset checks passed; visual and target-platform cook validation are still separate.")
