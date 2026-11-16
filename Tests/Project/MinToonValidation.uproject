@@ -1,0 +1,9 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Description": "Disposable validation project for the MinToon editor plugin.",
+  "AdditionalPluginDirectories": ["../.."],
+  "Plugins": [
+    {"Name": "MinToon", "Enabled": true}
+  ]
+}

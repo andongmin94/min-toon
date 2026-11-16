@@ -77,27 +77,53 @@ assets = create_starter_assets(
 
 현재 상태를 기록하는 문서는 이 README 하나로 유지한다. 변경 이력은 Git에 남긴다.
 
-| 검증/작업 | 2026-11-15 상태 |
+| 검증/작업 | 2026-11-16 상태 |
 | --- | --- |
 | 주요 UE 5.8 API·렌더링 전제 | Epic 공식 문서 대조; 실제 엔진 동작은 미검증 |
 | Python 구문 검사 | 현재 원격 결과는 아래 Actions 링크에서 확인 |
 | 설정·경로·버전·플러그인 선언 및 오류 처리 단위 테스트 | 순수 Python 검사; Unreal API를 모의 처리한 검사는 엔진 실행 검증이 아님 |
 | GitHub 저장소 / 초기 소스 | 공개 저장소 `andongmin94/min-toon`의 `main`에 반영 |
 | GitHub Actions | [Source checks 실행 결과](https://github.com/andongmin94/min-toon/actions/workflows/source-checks.yml); Python 소스 검사만 수행 |
+| 전용 UE 검증 프로젝트 | `Tests/Project/MinToonValidation.uproject`와 렌더링·패키징 설정 작성; 실제 UE 로드 미검증 |
 | UE 5.8 설치·시작·메뉴 실행 | 미검증: 작업 환경에 UE 없음 |
 | 네이티브 에셋 생성·셰이더 컴파일 | 미검증 |
 | 시각·cook 검증용 장면 생성 | `Tests/create_validation_scene.py` 작성; 실제 UE 실행 미검증 |
 | 캐릭터 적용·조명·Lumen·시간적 안정성 | 미검증 |
 | Cook·패키징 실행 | 미검증 |
 
-로컬 소스 검사에는 외부 패키지가 필요 없다.
+### 전용 Unreal 검증 프로젝트
+
+`Tests/Project/MinToonValidation.uproject`를 UE 5.8로 열어 기존 스크립트를 실행할 수 있도록
+최소 프로젝트를 함께 제공한다. `AdditionalPluginDirectories`의 `../..`는 이 프로젝트에서
+저장소 루트를 가리킨다. 현재 checkout의 `MinToon.uplugin`을 직접 참조하므로 플러그인
+복사본을 만들 필요가 없다. Python과 Editor Scripting 의존성은 플러그인 선언을 사용한다.
+
+| 파일 | 지정한 내용 |
+| --- | --- |
+| `MinToonValidation.uproject` | UE 5.8 연결, 저장소의 MinToon 활성화 |
+| `Config/DefaultEngine.ini` | Substrate·Blendable GBuffer, 생성될 검증 맵을 Game Default Map으로 지정 |
+| `Config/DefaultGame.ini` | `/Game/MinToonValidation/L_MinToonValidation`을 cook 대상 맵으로 지정 |
+
+**프로젝트 파일과 설정만 포함되어 있다.** 첫 checkout에는 검증 맵이나 재질이 없으므로
+아래의 에셋 검사와 장면 생성이 패키징보다 먼저다. 아직 없는 맵을 에디터 시작 맵으로
+강제하지 않는다. 실제 프로젝트 로드·플러그인 발견·설정 적용도 엔진 검증 대상이다.
+
+이 프로젝트에서 생성한 맵과 재질은 `Tests/Project/Content`에, 로그와 패키징 출력은
+`Tests/Project/Saved`에 남긴다. 생성 결과는 Git에서 제외하고 소스·프로젝트 설정을 추적한다.
+프로젝트를 열기만 해서는 에셋 생성 스크립트를 자동 실행하지 않는다.
+
+### Python 소스 검사
+
+로컬 소스 검사에는 외부 패키지가 필요 없다. 다음 명령은 Unreal을 실행하지 않는다.
 
 ```sh
 python -m compileall -q Content/Python Tests
 python -m unittest discover -s Tests -p 'test_*.py' -v
 ```
 
-실제 UE의 에셋 구조 검사는 빈 테스트 프로젝트에서 `Tests/unreal_smoke.py`를
+### Unreal 에셋 구조 검사
+
+실제 UE의 에셋 구조 검사는 위 전용 프로젝트에서 `Tests/unreal_smoke.py`를
 **Tools > Execute Python Script**로 실행한다. `/Game/MinToonSmoke`에 네이티브 에셋을
 생성한 다음 그 테스트 폴더만 정리한다. 폴더가 이미 존재하면 실행하지 않는다.
 테스트 폴더 정리에 실패하면 검사도 실패로 처리하며 성공 로그를 출력하지 않는다.
@@ -113,7 +139,7 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 스크립트다. 현재는 코드와 공식 API를 확인한 단계이며, 실제 UE에서 실행하지 않았다.
 생성 성공 로그는 렌더링·cook·패키징 검증 결과를 뜻하지 않는다.
 
-1. 위 설치·렌더링 설정을 적용한 빈 UE 5.8 테스트 프로젝트에서 시작한다.
+1. `Tests/Project/MinToonValidation.uproject`를 UE 5.8로 열어 시작한다.
    저장하지 않은 맵이나 콘텐츠 변경은 먼저 저장하거나 폐기한다.
 2. **Tools > Execute Python Script**로 `Tests/create_validation_scene.py`를 실행한다.
 3. `/Game/MinToonValidation`에 `TP_MinToon`, `M_MinToon`, `MI_MinToon`과
@@ -122,9 +148,9 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
    `Fill Point` 또는 `Key Directional`의 Intensity를 0으로 바꿔 단일 광원과 다중 광원을 비교한다.
 5. `Validation Camera`를 pilot하여 구도를 확인한다. 카메라는 Player 0 자동 활성화로
    설정하며, 에디터 뷰포트도 같은 위치와 방향으로 이동한다.
-6. 맵을 저장하고 에디터 재시작 후 다시 연다. 패키징 검증에서는 테스트 프로젝트의
-   Game Default Map과 패키징 대상 맵에 `L_MinToonValidation`을 지정하고,
-   대상 플랫폼 빌드와 실행 화면을 확인한다.
+6. 맵을 저장하고 에디터 재시작 후 다시 연다. 전용 프로젝트에는 이미 생성될 맵이
+   Game Default Map과 cook 대상으로 지정되어 있다. 장면 생성과 시각 확인이 끝나면
+   대상 플랫폼으로 패키징하고 실제 실행 화면을 확인한다.
 
 구성은 엔진 기본 구·상자 메시, 얇은 상자로 만든 바닥, Movable 방향광·점광원,
 카메라다. 메시의 컴포넌트에만 재질을 적용하며 엔진 메시 원본을 수정하지 않는다.
@@ -134,6 +160,41 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 맵 전환이 성공한 뒤에만 민툰 에셋을 생성하고, 생성한 에셋과 맵만 저장한다.
 생성 도중 실패하면 신규 폴더에 일부 에셋이 남을 수 있다. 자동 삭제하거나 덮어쓰지 않으므로
 Output Log와 해당 테스트 폴더를 확인한다.
+
+### 표준 에디터·패키징 명령
+
+다음은 저장소 루트에서 사용하는 Windows PowerShell 실행 예시다. 엔진 경로는 실제 설치
+위치에 맞춘다. 이 명령을 현재 작업 환경에서 실행한 것은 아니다.
+
+```powershell
+$MinToonRepo = (Get-Location).Path
+$MinToonEngine = 'C:\Program Files\Epic Games\UE_5.8'
+$MinToonProject = Join-Path $MinToonRepo 'Tests\Project\MinToonValidation.uproject'
+
+& "$MinToonEngine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" $MinToonProject "-ExecutePythonScript=$MinToonRepo\Tests\unreal_smoke.py" -log
+```
+
+Output Log에서 에셋 검사와 정리 성공을 확인한 다음, 장면 생성 스크립트를 실행한다.
+
+```powershell
+& "$MinToonEngine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" $MinToonProject "-ExecutePythonScript=$MinToonRepo\Tests\create_validation_scene.py" -log
+```
+
+`-ExecutePythonScript`는 전체 에디터와 시작 레벨을 로드한 뒤 스크립트를 실행하고 종료하는
+공식 실행 방식이다. 장면 생성 후 프로젝트를 에디터로 다시 열어 저장된 맵의 외관과
+카메라를 확인한다. 프로세스 종료만으로 시각 검증이 끝난 것으로 처리하지 않는다.
+
+맵 생성·저장·시각 확인 후, 엔진에 포함된 UAT로 Windows Development 패키징을 실행할 수 있다.
+추가 실행 스크립트나 별도 검증 프레임워크는 사용하지 않는다.
+
+```powershell
+& "$MinToonEngine\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun "-project=$MinToonProject" -noP4 -platform=Win64 -clientconfig=Development -build -cook -stage -pak -package -archive "-archivedirectory=$MinToonRepo\Tests\Project\Saved\Packaged"
+```
+
+UAT 결과와 로그를 확인하고 `Tests/Project/Saved/Packaged` 아래에 실제로 생성된 실행 파일을
+열어 검증 장면이 표시되는지 확인한다. 일반 전체 패키징을 검증 대상으로 삼는다.
+외부 플러그인 경로를 사용하는 cook 후 IDE 직접 실행·Zenstore 실행의 알려진 제한은
+[Epic UE-209807](https://issues.unrealengine.com/issue/UE-209807)을 참고한다.
 
 **다음 단계는 엔진 검증이다.** 메뉴 → 에셋 생성 → 단일/다중 광원 아래 메시 적용 →
 셰이더 오류 확인 → 저장·재시작 → 해당 메시를 포함한 맵의 cook·패키징 실행을 확인한다.
@@ -169,3 +230,6 @@ Output Log와 해당 테스트 폴더를 확인한다.
 - [EditorActorSubsystem — scene actors](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/EditorActorSubsystem?application_version=5.8)
 - [UnrealEditorSubsystem — viewport camera](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/UnrealEditorSubsystem)
 - [CameraActor — Player 0 activation](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/CameraActor)
+- [FProjectDescriptor — AdditionalPluginDirectories](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Projects/FProjectDescriptor)
+- [Configuration files — rendering settings and GameDefaultMap](https://dev.epicgames.com/documentation/unreal-engine/configuration-files-in-unreal-engine?lang=en-US)
+- [Build operations — UAT BuildCookRun](https://dev.epicgames.com/documentation/unreal-engine/build-operations-cooking-packaging-deploying-and-running-projects-in-unreal-engine?lang=en-US)
