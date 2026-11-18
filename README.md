@@ -4,11 +4,12 @@
 
 런처판 Unreal Engine을 수정하지 않고 사용하는 툰 캐릭터 제작 도구의 초기 소스다.
 현재 코드는 UE 5.8을 대상으로 작성했다. Toon BSDF/Toon Profile과 주요 Python API를
-Epic 공식 문서에서 대조했지만, 실제 설치 엔진에서의 동작 검증은 남아 있다.
+Epic 공식 문서에서 대조했고, UE 5.8.4에서 네이티브 에셋 생성 smoke 검사를 통과했다.
+화면 품질·cook·패키징 검증은 남아 있다.
 제품 이름은 **민툰 / MinToon**, 저장소 이름은 **min-toon**으로 정했다.
 MooaToon의 포크가 아니며, 해당 프로젝트의 코드·셰이더·에셋을 포함하지 않는다.
 
-> **개발 초안 — UE 실행 검증 전.** 현재는 Toon BSDF 기반 머티리얼 생성을 의도한
+> **개발 초안 — 에셋 생성만 UE에서 확인, 시각·cook 검증 전.** 현재는 Toon BSDF 기반 머티리얼 생성을 의도한
 > 에디터 저작 도구 초안이다. 자체 툰 렌더러, 완성형 캐릭터 셰이더, 검증된 배포 제품이 아니다.
 > MooaToon과 동급이거나 더 좋은 화질·성능을 확보했다는 주장은 하지 않는다.
 
@@ -77,16 +78,16 @@ assets = create_starter_assets(
 
 현재 상태를 기록하는 문서는 이 README 하나로 유지한다. 변경 이력은 Git에 남긴다.
 
-| 검증/작업 | 2026-11-16 상태 |
+| 검증/작업 | 2026-11-19 상태 |
 | --- | --- |
 | 주요 UE 5.8 API·렌더링 전제 | Epic 공식 문서 대조; 실제 엔진 동작은 미검증 |
 | Python 구문 검사 | 현재 원격 결과는 아래 Actions 링크에서 확인 |
 | 설정·경로·버전·플러그인 선언 및 오류 처리 단위 테스트 | 순수 Python 검사; Unreal API를 모의 처리한 검사는 엔진 실행 검증이 아님 |
 | GitHub 저장소 / 초기 소스 | 공개 저장소 `andongmin94/min-toon`의 `main`에 반영 |
 | GitHub Actions | [Source checks 실행 결과](https://github.com/andongmin94/min-toon/actions/workflows/source-checks.yml); Python 소스 검사만 수행 |
-| 전용 UE 검증 프로젝트 | `Tests/Project/MinToonValidation.uproject`와 렌더링·패키징 설정 작성; 실제 UE 로드 미검증 |
-| UE 5.8 설치·시작·메뉴 실행 | 미검증: 작업 환경에 UE 없음 |
-| 네이티브 에셋 생성·셰이더 컴파일 | 미검증 |
+| 전용 UE 검증 프로젝트 | UE 5.8.4(CL 58902052)에서 로드 확인. 외부 플러그인 MinToon 마운트, Substrate·Blendable GBuffer CVar 적용 로그 확인 |
+| UE 5.8 시작·메뉴 실행 | `UnrealEditor-Cmd` 무인 실행에서 `init_unreal.py` 오류 없이 실행. 메뉴 표시·클릭은 GUI에서 미확인 |
+| 네이티브 에셋 생성·셰이더 컴파일 | `Tests/unreal_smoke.py` 4개 테스트 통과, 테스트 폴더 정리 성공. `recompile_material` 오류 없음(PCD3D_SM5 에디터). 다른 플랫폼 미검증 |
 | 시각·cook 검증용 장면 생성 | `Tests/create_validation_scene.py` 작성; 실제 UE 실행 미검증 |
 | 캐릭터 적용·조명·Lumen·시간적 안정성 | 미검증 |
 | Cook·패키징 실행 | 미검증 |
@@ -127,8 +128,10 @@ python -m unittest discover -s Tests -p 'test_*.py' -v
 **Tools > Execute Python Script**로 실행한다. `/Game/MinToonSmoke`에 네이티브 에셋을
 생성한 다음 그 테스트 폴더만 정리한다. 폴더가 이미 존재하면 실행하지 않는다.
 테스트 폴더 정리에 실패하면 검사도 실패로 처리하며 성공 로그를 출력하지 않는다.
-이 스크립트는 생성 중 현재 에디터가 반환하는 컴파일 오류도 확인한다. 아직 실제 UE에서
-실행하지 않았으며, 이미지 품질이나 다른 플랫폼의 셰이더·cook 검증을 대신하지 않는다.
+이 스크립트는 생성 중 현재 에디터가 반환하는 컴파일 오류도 확인한다. 2026-11-19 UE 5.8.4에서
+아래 표준 명령에 `-unattended -nosplash`를 더해 실행했고 통과했다. 이미지 품질이나 다른 플랫폼의 셰이더·cook 검증을 대신하지 않는다.
+Python `unittest` 출력은 stderr로 나가므로 Output Log에서 `LogPython: Error:` 접두어가 붙지만,
+결과 판정은 마지막 `Ran N tests`·`OK`와 MinToon 성공 로그로 한다.
 
 메뉴 재등록은 에디터 Python 콘솔에서 `from mintoon.menu import register_menu` 후
 `register_menu()`를 두 번 실행하고 `Create starter materials` 항목이 하나인지 확인한다.
