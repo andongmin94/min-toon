@@ -4,6 +4,7 @@
   "Description": "Disposable validation project for the MinToon editor plugin.",
   "AdditionalPluginDirectories": ["../.."],
   "Plugins": [
-    {"Name": "MinToon", "Enabled": true}
+    {"Name": "MinToon", "Enabled": true},
+    {"Name": "AndroidFileServer", "Enabled": false}
   ]
 }

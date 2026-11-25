@@ -23,6 +23,9 @@ class SmokeCleanupTests(unittest.TestCase):
         self.mintoon = ModuleType("mintoon")
         self.mintoon.ToonSettings = Mock()
         self.mintoon.create_starter_assets = Mock(return_value=(object(), object(), object()))
+        self.mintoon.PARTS = {}
+        self.mintoon.ensure_style_library = Mock()
+        self.mintoon.stylize_actor = Mock()
 
     def _run_smoke(self):
         def load_probe(native_case):

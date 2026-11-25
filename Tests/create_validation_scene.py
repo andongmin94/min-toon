@@ -6,7 +6,7 @@ Existing output or unsaved project changes stop creation before switching maps.
 """
 import unreal
 
-from mintoon import create_starter_assets
+from mintoon import apply_lighting_preset, create_starter_assets
 from mintoon.assets import _preflight
 
 
@@ -70,14 +70,16 @@ def create_validation_scene():
     )
     key_component = key.get_component_by_class(unreal.DirectionalLightComponent)
     key_component.set_mobility(unreal.ComponentMobility.MOVABLE)
-    key_component.set_intensity(10_000.0)
+    key_component.set_intensity(10.0)  # lux, the engine default sun
 
     fill = _spawn(actors, unreal.PointLight, "Fill Point", unreal.Vector(-150, 0, 180))
     fill_component = fill.get_component_by_class(unreal.PointLightComponent)
     fill_component.set_mobility(unreal.ComponentMobility.MOVABLE)
     fill_component.set_intensity_units(unreal.LightUnits.LUMENS)
-    fill_component.set_intensity(1_000.0)
+    fill_component.set_intensity(100.0)
     fill_component.set_attenuation_radius(600.0)
+    # Sky, sky light and post process; without a sky, auto exposure meters a black background.
+    apply_lighting_preset()
 
     camera_location = unreal.Vector(-650, -650, 350)
     camera_rotation = unreal.MathLibrary.find_look_at_rotation(camera_location, unreal.Vector(0, 0, 80))

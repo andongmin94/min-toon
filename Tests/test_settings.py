@@ -8,7 +8,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "Content" / "Python"))
 from mintoon import ToonSettings
-from mintoon.settings import asset_paths, require_target_version
+from mintoon.settings import (BASE_TEXTURE_NAMES, PARTS, ToonPart, asset_paths, classify_slot, color_ramp_text,
+                              pick_name, profile_text, require_target_version, safe_asset_name)
 
 
 class SettingsTests(unittest.TestCase):
@@ -68,6 +69,37 @@ class SettingsTests(unittest.TestCase):
         self.assertNotIn("Modules", data)
         self.assertEqual({item["Name"] for item in data["Plugins"]}, {"PythonScriptPlugin", "EditorScriptingUtilities"})
         self.assertTrue(all(item["TargetAllowList"] == ["Editor"] for item in data["Plugins"]))
+
+
+    def test_parts_and_profile_text(self):
+        self.assertEqual(set(PARTS), {"Body", "Face", "Hair", "Background"})
+        text = profile_text(PARTS["Body"])
+        self.assertTrue(text.startswith("(DiffuseRamp=(ColorCurves[0]=(Keys=((Time=0.000000,Value=0.620000)"))
+        self.assertIn("ColorCurves[2]=", text)
+        self.assertIn("bDiffuseRampIncludeShadow=True", text)
+        self.assertEqual(color_ramp_text(((0.0, (0.1, 0.2, 0.3)), (1.0, (1, 1, 1)))).count("Time="), 6)
+
+    def test_part_validation(self):
+        good = dict(name="X", diffuse_ramp=((0.0, (0, 0, 0)), (1.0, (1, 1, 1))), specular_ramp=((0.0, 0.0), (1.0, 0.0)),
+                    diffuse_indirect_scale=0.5, specular_indirect_scale=0.1, roughness=0.5, specular=0.5,
+                    rim_strength=0.1, outline_width=0.2)
+        ToonPart(**good)
+        for field, value in (("name", "Bad Name"), ("diffuse_ramp", ((0.5, (0, 0, 0)), (0.5, (1, 1, 1)))),
+                             ("diffuse_ramp", ((0.0, (0, 0, 2)), (1.0, (1, 1, 1)))), ("specular_ramp", ((0.0, 0.0),)),
+                             ("outline_width", -1.0), ("rim_strength", 1.5)):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                ToonPart(**{**good, field: value})
+
+    def test_slot_classification_and_names(self):
+        self.assertEqual(classify_slot("N00_000_Hair_00_HAIR (Instance)"), "Hair")
+        self.assertEqual(classify_slot("N00_000_00_FaceMouth_00_FACE"), "Face")
+        self.assertEqual(classify_slot("N00_000_00_EyeIris_00_EYE"), "Face")
+        self.assertEqual(classify_slot("N00_002_01_Shoes_01_CLOTH"), "Body")
+        self.assertEqual(pick_name(["mtoon_Color", "mtoon_tex_MainTex"], BASE_TEXTURE_NAMES), "mtoon_tex_MainTex")
+        self.assertEqual(pick_name(["T_Albedo_Map"], BASE_TEXTURE_NAMES), "T_Albedo_Map")
+        self.assertIsNone(pick_name(["Normal", "Roughness"], BASE_TEXTURE_NAMES))
+        self.assertEqual(safe_asset_name("안동민 Body (Instance)"), "Body_Instance")
+        self.assertEqual(safe_asset_name("한글"), "Slot")
 
 
 if __name__ == "__main__":

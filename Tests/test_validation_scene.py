@@ -26,6 +26,7 @@ class ValidationSceneBoundaryTests(unittest.TestCase):
         self.mintoon = ModuleType("mintoon")
         self.mintoon.__path__ = []
         self.mintoon.create_starter_assets = Mock(name="create_starter_assets")
+        self.mintoon.apply_lighting_preset = Mock(name="apply_lighting_preset")
         self.assets_module = ModuleType("mintoon.assets")
         self.assets_module._preflight = Mock(name="_preflight")
 

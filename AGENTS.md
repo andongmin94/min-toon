@@ -10,4 +10,4 @@
 - Keep current status in README.md; use Git for history, not duplicate reports.
 - Scope validation to changed code. Do not call Python unit tests or syntax checks UE integration tests.
 - Engine startup, native API calls, shader compilation, visual quality and packaged execution must be verified in UE before claiming support.
-- The immediate next task is the UE 5.8 smoke/visual/cook gate in README.md, not more architecture.
+- The UE 5.8 smoke/visual/cook gate passed on Win64; the immediate next task is under "다음 단계" in README.md.

@@ -33,7 +33,7 @@ class AssetCreationTests(unittest.TestCase):
         self.material_library = self.unreal.MaterialEditingLibrary
         self.material_library.create_material_expression.side_effect = lambda *args: Mock()
         self.material_library.get_material_expression_input_names.return_value = [
-            "Base Color", "Roughness", "Specular", "Anisotropy",
+            "Base Color", "Roughness", "Specular", "Anisotropy", "Emissive Color", "A", "B", "ExponentIn",
         ]
         self.material_library.connect_material_expressions.return_value = True
         self.material_library.connect_material_property.return_value = True
