@@ -65,9 +65,10 @@ class NativeAssetTests(unittest.TestCase):
             self.assertIn("bDiffuseRampIncludeShadow=True", text, name)
             self.assertAlmostEqual(settings.get_editor_property("diffuse_indirect_scale"),
                                    part.diffuse_indirect_scale, places=5)
-            width = unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(
-                library[f"MI_Outline_{name}"], "OutlineWidth")
-            self.assertAlmostEqual(width, part.outline_width, places=5)
+            for parameter, value in (("OutlineWidth", part.outline_width), ("OutlineFromPivot", part.outline_from_pivot)):
+                actual = unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(
+                    library[f"MI_Outline_{name}"], parameter)
+                self.assertAlmostEqual(actual, value, places=5, msg=f"{name} {parameter}")
         self.assertEqual(library["Outline"].get_editor_property("blend_mode"), unreal.BlendMode.BLEND_MASKED)
         # Second call loads the same set instead of creating or overwriting.
         self.assertEqual(ensure_style_library(ROOT + "/Style")["M_Body"], library["M_Body"])
@@ -96,7 +97,7 @@ class NativeAssetTests(unittest.TestCase):
             component.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Cube"))
             component.set_material(0, source)
             created = stylize_actor(actor, ROOT)
-            self.assertEqual(len(created), 1)
+            self.assertEqual(len(created), 2)  # toon instance + its outline instance
             result = component.get_material(0)
             self.assertEqual(result, created[0])
             self.assertEqual(result.get_base_material().get_path_name(),
@@ -106,8 +107,14 @@ class NativeAssetTests(unittest.TestCase):
             self.assertAlmostEqual(color.b, 0.6, places=4)
             self.assertEqual(result.get_blend_mode(), unreal.BlendMode.BLEND_MASKED)
             self.assertTrue(result.get_editor_property("base_property_overrides").get_editor_property("two_sided"))
-            self.assertEqual(component.get_overlay_material(),
+            self.assertIsNone(component.get_overlay_material())
+            overlays = component.get_editor_property("material_slots_overlay_material")
+            self.assertEqual(len(overlays), 1)
+            self.assertEqual(overlays[0].get_editor_property("parent"),
                              ensure_style_library(ROOT + "/Style")["MI_Outline_Background"])
+            # The masked source's texture travels to the outline so its alpha clips the hull.
+            self.assertEqual(unreal.MaterialEditingLibrary.get_material_instance_texture_parameter_value(
+                overlays[0], "BaseColorTexture"), texture)
         finally:
             actors.destroy_actor(actor)
 

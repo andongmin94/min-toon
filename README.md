@@ -7,9 +7,9 @@
 제품 이름은 **민툰 / MinToon**, 저장소 이름은 **min-toon**이다.
 MooaToon의 포크가 아니며, 해당 프로젝트의 코드·셰이더·에셋을 포함하지 않는다.
 
-> **개발 버전 0.1 — UE 5.8.4 Windows에서 생성·화면·패키징 확인.** 아래 "검증과 현재 상태"에
-> 적힌 범위만 확인했다. Toon BSDF 자체가 Epic 기준 **Experimental**이며, 다른 플랫폼·애니메이션
-> 중 안정성·Sequencer 렌더는 아직 확인하지 않았다. MooaToon과 동급 화질을 주장하지 않는다.
+> **개발 버전 0.2 — UE 5.8.4 Windows에서 생성·화면·애니메이션 렌더·패키징 확인.** 아래 "검증과
+> 현재 상태"에 적힌 범위만 확인했다. Toon BSDF 자체가 Epic 기준 **Experimental**이며, 다른
+> 플랫폼·Lumen·다른 VRM 모델은 아직 확인하지 않았다. MooaToon과 동급 화질을 주장하지 않는다.
 
 ## 현재 구현
 
@@ -31,18 +31,24 @@ Python 에디터 플러그인이다. C++ 모듈·엔진 소스·셰이더 변경
 | Body | 피부·옷 | 2단 램프, 붉은 기 도는 그림자, 작은 하이라이트 |
 | Face | 얼굴·눈·입 | 명암 경계를 크게 뒤로 밀어 얼굴 대부분이 밝게 유지 |
 | Hair | 머리카락 | 2단 램프, 넓은 하이라이트 띠, 강한 림라이트 |
-| Background | 배경 정적 메시 | 3단 램프, 푸른 그림자, 간접광 비중 큼 |
+| Background | 배경 정적 메시 | 2단 램프, 푸른 그림자, 간접광 비중 큼, 외곽선은 피벗 방향 확장 |
 
 파트마다 Toon Profile(확산·반사 램프, 간접광 배율, 그림자를 램프에 포함)과 부모 머티리얼
 (`BaseColorTexture` × `BaseColor`, Roughness, Specular, Anisotropy, Fresnel 림라이트, Emissive,
-알파 마스크)을 만든다. 외곽선은 메시 컴포넌트의 **Overlay Material**로 붙는 inverted hull
-(`M_MinToon_Outline`, 파트별 두께 인스턴스)이다.
+알파 마스크)을 만든다. 외곽선은 메시 컴포넌트의 **슬롯별 Overlay Material**
+(`MaterialSlotsOverlayMaterial`)로 붙는 inverted hull(`M_MinToon_Outline`, 파트별 인스턴스)이다.
+슬롯마다 외곽선 인스턴스를 따로 만들어 파트별 두께를 쓰고, 마스크 슬롯은 원본 텍스처 알파로
+외곽선도 잘라 투명한 안경알·머리카락 틈에 검은 껍질이 생기지 않는다. 두께(`OutlineWidth`)는 카메라 5 m 기준 cm이고
+카메라 거리에 비례해 0.5~4배로 바뀌어 화면 두께가 비슷하게 유지된다. `OutlineFromPivot`이 1이면
+노멀 대신 오브젝트 피벗에서 바깥 방향으로 밀어, 상자처럼 노멀이 갈라진 볼록 메시도 끊기지 않는다
+(배경 기본값 1, 캐릭터 0). `OutlineDepthBias`(기본 1 cm)만큼 껍질을 카메라 반대쪽으로 밀어,
+피부 바로 밑의 겹친 면(VRoid 입·턱 안쪽)이 검은 얼룩으로 비치지 않게 한다.
 
 **Stylize 동작:** 스켈레탈 메시는 머티리얼 슬롯 이름으로 Face/Hair/Body를 고르고(VRoid·VRM
 이름 규칙), 스태틱 메시는 Background를 쓴다. 기존 재질에서 알베도 텍스처와 색
 (`mtoon_tex_MainTex`, `gltf_tex_diffuse`, `BaseColor` 등, 없으면 처음 쓰는 sRGB 텍스처),
 반투명·마스크 여부, 양면 여부를 읽어 `/Game/MinToon/Instances/<액터>`에 인스턴스를 만든다.
-**메시 에셋은 수정하지 않고** 레벨의 컴포넌트 재질만 바꾸므로 레벨을 저장해야 유지된다.
+**메시 에셋은 수정하지 않고** 레벨의 컴포넌트 재질·오버레이만 바꾸므로 레벨을 저장해야 유지된다.
 
 ## 설치와 사용
 
@@ -73,31 +79,43 @@ for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_select
 apply_lighting_preset()
 ```
 
+**애니메이션·Sequencer:** MinToon 재질은 엔진 기본 재질이라 Level Sequence·Movie Render Queue에
+별도 설정 없이 쓴다. `Tests/create_motion_scene.py`가 예시다. 엔진 템플릿 마네킹 애니메이션을
+IK Rig 자동 리타겟(`IKRigController.apply_auto_generated_retarget_definition`,
+`IKRetargetBatchOperation.run_batch_retarget`)으로 VRM에 옮기고, 태양 회전·카메라 궤도/돌리를
+키로 넣은 시퀀스와 MRQ 설정을 만든다. 렌더할 때는 Sky Light 실시간 캡처가 채워지도록 워밍업
+프레임(엔진 64, 렌더 32)을 두고, 외곽선 깜박임을 보려고 모션 블러를 끈다.
+
 ## 검증과 현재 상태
 
 현재 상태 문서는 이 README 하나다. 이력은 Git에 남긴다.
 환경: Windows 11, UE 5.8.4 (CL 58902052, 런처판), VRM4U 5.8 (2026-11-10 릴리스).
 
-| 검증 | 2026-11-20 결과 |
+| 검증 | 2026-11-26 결과 |
 | --- | --- |
 | 플러그인 로드·메뉴 | 검증 프로젝트에서 MinToon 마운트, `Tools > MinToon` 메뉴 등록 확인(GUI 에디터). 메뉴 클릭은 사람이 직접 확인하지 않음 |
-| 에셋 생성·컴파일 (`Tests/unreal_smoke.py`) | 6개 테스트 통과: 스타터 에셋, 파트별 프로파일 램프 적용, 외곽선, 원본 재질의 텍스처·색·마스크·양면 이어받기, 정리 |
-| VRM 적용 (`Tests/create_vrm_scene.py`) | 사용자 VRM을 VRM4U로 가져와 6개 슬롯 Stylize, 배경 8개 + 조명 프리셋, 오류 없음 |
-| 화면 (`Tests/capture_views.py`) | 에디터 뷰포트 캡처로 셀 명암, 틴트 그림자, 외곽선, 배경 통일 확인 |
-| Cook·패키징 | 설치 형태 복사본(`Plugins/MinToon`)으로 UAT BuildCookRun Win64 Development 성공, 두 맵 cook |
-| 패키지 실행 | 패키지 exe로 두 맵 실행, 에디터와 같은 외관 확인 |
+| 에셋 생성·컴파일 (`Tests/unreal_smoke.py`) | 6개 테스트 통과: 스타터 에셋, 파트별 프로파일 램프·외곽선 파라미터, 원본 재질의 텍스처·색·마스크·양면 이어받기, 슬롯별 외곽선과 알파 텍스처, 정리 |
+| VRM 적용 (`Tests/create_vrm_scene.py`) | 사용자 VRM을 VRM4U로 가져와 7개 슬롯 Stylize, 배경 8개 + 조명 프리셋, 오류 없음 |
+| 화면 (`Tests/capture_views.py`) | 에디터 뷰포트 캡처로 셀 명암, 틴트 그림자, 외곽선, 투명 안경알, 배경 통일 확인 |
+| 애니메이션·Sequencer (`Tests/create_motion_scene.py`) | 마네킹 대기·공격·조깅을 VRM에 자동 리타겟, 8초 시퀀스(태양 150° 회전, 카메라 궤도·돌리)를 MRQ 명령줄 렌더로 192프레임 PNG 출력. 프레임 검토에서 외곽선·그림자·얼굴 명암이 움직임 중 유지됨 |
+| Cook·패키징 | 설치 형태 복사본(`Plugins/MinToon`)으로 UAT BuildCookRun Win64 Development 성공, 세 맵(검증·VRM·모션) cook |
+| 패키지 실행 | 패키지 exe로 VRM·모션 맵 실행, 에디터와 같은 외관(투명 안경알, 슬롯별 외곽선) 확인. 맵에 시퀀스 자동 재생을 두지 않아 패키지 안 시퀀스 재생은 확인하지 않음 |
 | Python 소스 검사 | 18개 Python 테스트 통과(일부는 Unreal 모의). 모의 테스트는 엔진 검증이 아님 |
-| 미검증 | 애니메이션·표정 중 외곽선/그림자 안정성, Lumen, Sequencer·Movie Render Queue, Win64 외 플랫폼 |
+| 미검증 | 메뉴 수동 클릭, 표정(블렌드셰이프) 애니메이션 중 얼굴, Lumen, 다른 VRM 모델, Win64 외 플랫폼, 반투명 툰 재질의 화면(컴파일만 확인) |
 
 ### 알려진 한계
 
 - **그림자 = Sky Light.** Toon BSDF는 그림자 속에 직접광을 주지 않는다. Sky Light가 없거나
   캡처가 갱신되지 않으면 그림자가 0(검정)이 된다.
-- 드리운 그림자 가장자리에 얇고 어두운 테두리가 보인다(램프와 그림자 경계 처리).
-- 외곽선은 정점 노멀 방향 확장이라 하드 엣지 메시(상자)는 모서리가 끊긴다. 두께는 월드 단위(cm)라
-  화면 거리 보정이 없다.
-- 얼굴 그림자는 램프 위치로만 조절한다. 얼굴 SDF 그림자, 헤어 그림자 투영은 없다.
-- 반투명 재질은 마스크로만 바뀐다. MToon의 shade 텍스처·rim 텍스처·matcap은 쓰지 않는다.
+- 램프는 그림자 단계를 하나만 둔다. 부드러운 그림자 경계가 램프 입력을 0~1로 쓸고 지나가므로,
+  중간 톤을 넣으면 드리운 그림자 둘레에 띠가 생긴다(이전 3단 배경 램프에서 확인 후 제거).
+- 캐릭터 외곽선은 노멀 방향 확장이라 노멀이 갈라진 하드 엣지 캐릭터 메시는 끊길 수 있다.
+  피벗 방향 확장은 볼록한 배경 소품에만 맞다. 깊이 바이어스 때문에 1 cm 안쪽으로 붙은 물체 사이의
+  외곽선은 보이지 않는다.
+- 얼굴 그림자는 램프 위치로만 조절한다(대부분 밝게 유지). 빛 방향을 따르는 얼굴 SDF 그림자는
+  모델별 그림자 텍스처를 그려야 해서 넣지 않았다. 헤어 그림자 투영도 없다.
+- 반투명 재질은 마스크로 바뀐다. 반투명 Toon 재질은 컴파일만 확인했고 화면은 확인하지 않았다.
+  MToon의 shade 텍스처·rim 텍스처·matcap은 쓰지 않는다.
 - Toon Profile 오버라이드는 Python으로 설정할 수 없어(`ToonProfileOverride`가 편집 불가 속성)
   파트마다 부모 머티리얼을 둔다.
 
@@ -146,6 +164,22 @@ $env:MINTOON_MAP = '/Game/MinToonVRM/L_MinToonVRM'
 PNG는 `Tests/Project/Saved/MinToonCaptures`에 저장된다. SceneCapture2D 방식은 UE 5.8에서
 Sky Light 없이 렌더되어 쓰지 않는다.
 
+애니메이션 렌더는 VRM 장면을 만든 뒤 엔진 템플릿 마네킹을 검증 프로젝트로 복사하고
+(`Templates/TemplateResources/High/Characters/Content/Mannequins` →
+`Tests/Project/Content/Characters/Mannequins`), `MovieRenderPipeline` 플러그인(검증 프로젝트에서
+켜 둠)으로 명령줄 렌더한다. Git Bash에서는 `/Game/...` 인자가 Windows 경로로 바뀌므로
+PowerShell에서 실행한다.
+
+```powershell
+& $Cmd $Project "-ExecutePythonScript=$Repo\Tests\create_motion_scene.py" -unattended -nosplash -log
+& "$Engine\Engine\Binaries\Win64\UnrealEditor.exe" $Project /Game/MinToonMotion/L_MinToonMotion -game `
+  -LevelSequence=/Game/MinToonMotion/LS_MinToonMotion -MoviePipelineConfig=/Game/MinToonMotion/MRQ_MinToonMotion `
+  -windowed -resx=1280 -resy=720 -unattended
+```
+
+프레임은 `Tests/Project/Saved/MinToonMotion/MinToonMotion.0000.png`부터 저장된다. 시퀀스 바인딩은
+맵 패키지 경로를 저장하므로, 스크립트는 VRM 맵을 먼저 새 이름으로 저장하고 그 사본에서 바인딩한다.
+
 **패키징은 설치 형태로 한다.** UnrealBuildTool은 `AdditionalPluginDirectories`의 *하위 폴더*에서만
 플러그인을 찾으므로, 코드 플러그인(VRM4U)이 있어 빌드가 필요하면 `../..`(플러그인 폴더 자체)를
 찾지 못하고 실패한다. 검증 프로젝트를 임시 폴더로 복사하고(`Saved`·`Intermediate` 제외),
@@ -156,19 +190,21 @@ Sky Light 없이 렌더되어 쓰지 않는다.
 & "$Engine\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun "-project=$Copy\MinToonValidation.uproject" -noP4 `
   -platform=Win64 -clientconfig=Development -build -cook -stage -pak -package -archive `
   "-archivedirectory=$Repo\Tests\Project\Saved\Packaged" `
-  "-map=/Game/MinToonValidation/L_MinToonValidation+/Game/MinToonVRM/L_MinToonVRM"
+  "-map=/Game/MinToonValidation/L_MinToonValidation+/Game/MinToonVRM/L_MinToonVRM+/Game/MinToonMotion/L_MinToonMotion"
 ```
 
 패키지 exe에 맵 경로와 `-ExecCmds="HighResShot 1600x900"`을 주면 실행 화면이
-`Packaged/Windows/MinToonValidation/Saved/Screenshots`에 저장된다. 두 맵에는 PlayerStart가 없어
+`Packaged/Windows/MinToonValidation/Saved/Screenshots`에 저장된다. 맵에는 PlayerStart가 없어
 엔진 기본 폰(구)이 원점에 보인다.
 
 ## 다음 단계
 
-툰 렌더링 기본 경로(재질·외곽선·VRM·배경·조명·패키징)가 확인됐다. 다음은 **Sequencer**다:
-VRM에 애니메이션을 붙여 움직일 때 외곽선·그림자·얼굴 명암이 안정적인지 확인하고,
-카메라 컷과 Movie Render Queue 렌더를 자동화한다. 화질 조정(얼굴 그림자, 그림자 테두리,
-외곽선 화면 두께 보정)은 그 결과를 보고 우선순위를 정한다.
+툰 렌더링 경로(재질·외곽선·VRM·배경·조명·애니메이션 렌더·패키징)가 확인됐다. 남은 일:
+
+1. 사람이 에디터에서 `Tools > MinToon` 메뉴 세 개를 직접 눌러 확인한다.
+2. 표정(블렌드셰이프) 애니메이션과 다른 VRM 모델로 같은 렌더를 돌려 얼굴 외곽선·명암을 확인한다.
+3. 얼굴 SDF 그림자: 모델별 그림자 텍스처가 필요하다. 아트 입력이 생기면 Face 재질 옵션으로 넣는다.
+4. Lumen·다른 플랫폼은 필요할 때 같은 절차로 확인한다.
 
 ## 저장소
 
@@ -202,5 +238,8 @@ VRM에 애니메이션을 붙여 움직일 때 외곽선·그림자·얼굴 명�
 - [FProjectDescriptor — AdditionalPluginDirectories](https://dev.epicgames.com/documentation/en-us/unreal-engine/API/Runtime/Projects/FProjectDescriptor)
 - [Configuration files — rendering settings and GameDefaultMap](https://dev.epicgames.com/documentation/unreal-engine/configuration-files-in-unreal-engine?lang=en-US)
 - [MeshComponent — Overlay Material](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MeshComponent)
+- [MeshComponent — MaterialSlotsOverlayMaterial](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MeshComponent)
+- [IKRetargetBatchOperation](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/IKRetargetBatchOperation)
+- [Movie Render Queue command line rendering](https://dev.epicgames.com/documentation/unreal-engine/rendering-high-quality-frames-with-movie-render-queue-in-unreal-engine)
 - [AutomationLibrary — TakeHighResScreenshot](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/AutomationLibrary)
 - [Build operations — UAT BuildCookRun](https://dev.epicgames.com/documentation/unreal-engine/build-operations-cooking-packaging-deploying-and-running-projects-in-unreal-engine?lang=en-US)

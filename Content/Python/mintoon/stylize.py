@@ -70,8 +70,26 @@ def _instance_for(path: str, parent, source):
     return instance, True
 
 
+def _outline_for(path: str, parent, toon_instance):
+    """Per-slot outline instance; masked slots pass their albedo texture so the alpha clips the hull."""
+    if unreal.EditorAssetLibrary.does_asset_exist(path):
+        return unreal.load_asset(path), False
+    folder, name = path.rsplit("/", 1)
+    instance = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        name, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    if instance is None:
+        raise RuntimeError(f"Could not create {path}.")
+    LIB.set_material_instance_parent(instance, parent)
+    if toon_instance.get_blend_mode() == unreal.BlendMode.BLEND_MASKED:
+        texture = LIB.get_material_instance_texture_parameter_value(toon_instance, "BaseColorTexture")
+        if texture is not None:
+            LIB.set_material_instance_texture_parameter_value(instance, "BaseColorTexture", texture)
+    LIB.update_material_instance(instance)
+    return instance, True
+
+
 def stylize_actor(actor, root: str = "/Game/MinToon", part: str | None = None, outline: bool = True):
-    """Give every mesh component of the actor MinToon materials and an outline overlay.
+    """Give every mesh component of the actor MinToon materials and per-slot outline overlays.
 
     Skeletal meshes pick Face/Hair/Body per slot name; static meshes use Background
     unless `part` names one of PARTS for all slots.
@@ -89,6 +107,7 @@ def stylize_actor(actor, root: str = "/Game/MinToon", part: str | None = None, o
         skeletal = isinstance(component, unreal.SkeletalMeshComponent)
         slots = [str(name) for name in component.get_material_slot_names()]
         materials = component.get_materials()
+        overlays = []
         for index, source in enumerate(materials):
             slot = slots[index] if index < len(slots) else f"Slot{index}"
             slot_part = part or (classify_slot(slot) if skeletal else "Background")
@@ -97,9 +116,17 @@ def stylize_actor(actor, root: str = "/Game/MinToon", part: str | None = None, o
             if is_new:
                 created.append(instance)
             component.set_material(index, instance)
-        if outline:
-            outline_part = part or ("Body" if skeletal else "Background")
-            component.set_overlay_material(library[f"MI_Outline_{outline_part}"])
+            if outline:
+                outline_instance, is_new = _outline_for(path + "_Outline", library[f"MI_Outline_{slot_part}"], instance)
+                if is_new:
+                    created.append(outline_instance)
+                overlays.append(outline_instance)
+            else:
+                overlays.append(None)
+        # One overlay per slot: each part keeps its own width, and the hull is clipped by the
+        # slot's alpha. A whole-component overlay drew opaque hulls over cut-out lenses.
+        component.set_overlay_material(None)
+        component.set_editor_property("material_slots_overlay_material", overlays)
     for asset in created:
         if not unreal.EditorAssetLibrary.save_loaded_asset(asset, only_if_is_dirty=False):
             raise RuntimeError(f"Could not save {asset.get_path_name()}.")

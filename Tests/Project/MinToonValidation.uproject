@@ -5,6 +5,7 @@
   "AdditionalPluginDirectories": ["../.."],
   "Plugins": [
     {"Name": "MinToon", "Enabled": true},
-    {"Name": "AndroidFileServer", "Enabled": false}
+    {"Name": "AndroidFileServer", "Enabled": false},
+    {"Name": "MovieRenderPipeline", "Enabled": true}
   ]
 }

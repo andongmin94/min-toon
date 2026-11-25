@@ -49,7 +49,8 @@ class ToonPart:
     roughness: float
     specular: float
     rim_strength: float
-    outline_width: float  # centimetres, world space
+    outline_width: float  # centimetres at 5 m from the camera; scales with distance (0.5x-4x)
+    outline_from_pivot: float = 0.0  # 0 pushes the outline along normals, 1 away from the pivot
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"[A-Za-z0-9]+", self.name):
@@ -61,7 +62,7 @@ class ToonPart:
                 _number_in_range("diffuse_ramp value", value, 0.0, 1.0)
         for _, value in self.specular_ramp:
             _number_in_range("specular_ramp value", value, 0.0, 1.0)
-        for field in ("roughness", "specular", "rim_strength"):
+        for field in ("roughness", "specular", "rim_strength", "outline_from_pivot"):
             _number_in_range(field, getattr(self, field), 0.0, 1.0)
         for field in ("diffuse_indirect_scale", "specular_indirect_scale", "outline_width"):
             _number_in_range(field, getattr(self, field), 0.0, math.inf)
@@ -76,22 +77,23 @@ def _keys_in_order(name: str, times: list[float]) -> None:
         raise ValueError(f"{name} key times must increase strictly.")
 
 
-# Starting looks, checked in the VRM validation scene (Tests/create_vrm_scene.py). Ramp input is
-# half-Lambert (N·L*0.5+0.5) times shadow, so 0.5 is the terminator. Fully shadowed areas get no
-# direct light at all, only sky light scaled by diffuse_indirect_scale; keep a sky light in the level.
+# Starting looks, checked in the VRM validation scene (Tests/create_vrm_scene.py) and the motion
+# render (Tests/create_motion_scene.py). Ramp input is half-Lambert (N·L*0.5+0.5) times shadow, so
+# 0.5 is the terminator. Fully shadowed areas get no direct light at all, only sky light scaled by
+# diffuse_indirect_scale; keep a sky light in the level. Ramps use one shadow step: soft shadow
+# edges sweep the input through every key, so a middle tone shows up as a band around cast shadows.
 # The face switches far behind the terminator so most of it stays lit, as in anime character art.
 PARTS = {
     part.name: part
     for part in (
         ToonPart("Body", ((0.0, (0.62, 0.50, 0.55)), (0.42, (0.62, 0.50, 0.55)), (0.47, (1.0, 1.0, 1.0)), (1.0, (1.0, 1.0, 1.0))),
-                 ((0.0, 0.0), (0.92, 0.0), (0.94, 0.6), (1.0, 0.6)), 0.65, 0.15, 0.6, 0.25, 0.20, 0.20),
+                 ((0.0, 0.0), (0.92, 0.0), (0.94, 0.6), (1.0, 0.6)), 1.00, 0.15, 0.6, 0.25, 0.20, 0.25),
         ToonPart("Face", ((0.0, (0.84, 0.70, 0.70)), (0.18, (0.84, 0.70, 0.70)), (0.24, (1.0, 1.0, 1.0)), (1.0, (1.0, 1.0, 1.0))),
-                 ((0.0, 0.0), (1.0, 0.0)), 0.80, 0.10, 0.8, 0.10, 0.10, 0.12),
+                 ((0.0, 0.0), (1.0, 0.0)), 1.00, 0.10, 0.8, 0.10, 0.10, 0.15),
         ToonPart("Hair", ((0.0, (0.55, 0.47, 0.58)), (0.40, (0.55, 0.47, 0.58)), (0.45, (1.0, 1.0, 1.0)), (1.0, (1.0, 1.0, 1.0))),
-                 ((0.0, 0.0), (0.78, 0.0), (0.80, 1.0), (1.0, 1.0)), 0.65, 0.20, 0.35, 0.50, 0.25, 0.20),
-        ToonPart("Background", ((0.0, (0.42, 0.47, 0.60)), (0.30, (0.42, 0.47, 0.60)), (0.36, (0.74, 0.75, 0.82)),
-                                (0.62, (0.74, 0.75, 0.82)), (0.68, (1.0, 1.0, 1.0)), (1.0, (1.0, 1.0, 1.0))),
-                 ((0.0, 0.0), (1.0, 0.0)), 1.00, 0.20, 0.8, 0.10, 0.0, 0.8),
+                 ((0.0, 0.0), (0.78, 0.0), (0.80, 1.0), (1.0, 1.0)), 1.00, 0.20, 0.35, 0.50, 0.25, 0.25),
+        ToonPart("Background", ((0.0, (0.50, 0.55, 0.68)), (0.40, (0.50, 0.55, 0.68)), (0.46, (1.0, 1.0, 1.0)), (1.0, (1.0, 1.0, 1.0))),
+                 ((0.0, 0.0), (1.0, 0.0)), 1.80, 0.20, 0.8, 0.10, 0.0, 0.8, outline_from_pivot=1.0),
     )
 }
 

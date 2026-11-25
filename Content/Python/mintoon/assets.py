@@ -139,12 +139,57 @@ def _build_outline_material(material, path: str) -> None:
     sign = _expression(material, unreal.MaterialExpressionTwoSidedSign, -900, 200)
     mask = _binary(material, unreal.MaterialExpressionMultiply, -700, 200, sign, const_b=-0.5)
     mask = _binary(material, unreal.MaterialExpressionAdd, -500, 200, mask, const_b=0.5)
+    # Per-slot instances copy the slot's albedo texture so cut-out parts (glasses lenses, hair
+    # card gaps) get no hull where the surface itself is clipped.
+    texture = _expression(material, unreal.MaterialExpressionTextureSampleParameter2D, -900, 0)
+    texture.set_editor_property("parameter_name", "BaseColorTexture")
+    texture.set_editor_property("group", "MinToon")
+    texture.set_editor_property("texture", unreal.load_asset(WHITE_TEXTURE))
+    mask = _binary(material, unreal.MaterialExpressionMultiply, -350, 200, texture, mask, "A")
     _output(mask, "", unreal.MaterialProperty.MP_OPACITY_MASK)
 
-    normal = _expression(material, unreal.MaterialExpressionVertexNormalWS, -900, 400)
-    width = _scalar(material, "OutlineWidth", 0.2, -900, 520, 0.0, 5.0)
-    _output(_binary(material, unreal.MaterialExpressionMultiply, -500, 400, normal, width), "",
-            unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    # Push direction: the vertex normal, or the direction from the object pivot. Split normals on
+    # hard edges (box corners) open gaps in the hull; the pivot direction keeps convex props closed.
+    position = _expression(material, unreal.MaterialExpressionWorldPosition, -1500, 500)
+    position.set_editor_property("world_position_shader_offset",
+                                 unreal.WorldPositionIncludedOffsets.WPT_EXCLUDE_ALL_SHADER_OFFSETS)
+    pivot = _expression(material, unreal.MaterialExpressionObjectPositionWS, -1500, 620)
+    radial = _binary(material, unreal.MaterialExpressionSubtract, -1300, 560, position, pivot)
+    radial_dir = _expression(material, unreal.MaterialExpressionNormalize, -1150, 560)
+    _connect(radial, radial_dir, "VectorInput")
+    normal = _expression(material, unreal.MaterialExpressionVertexNormalWS, -1150, 420)
+    direction = _expression(material, unreal.MaterialExpressionLinearInterpolate, -950, 450)
+    _connect(normal, direction, "A")
+    _connect(radial_dir, direction, "B")
+    _connect(_scalar(material, "OutlineFromPivot", 0.0, -1150, 700), direction, "Alpha")
+
+    # Scale with camera distance so the line keeps a similar screen width: OutlineWidth is the
+    # width at OutlineReferenceDistance, clamped to 0.5x-4x so close-ups and far shots stay sane.
+    camera = _expression(material, unreal.MaterialExpressionCameraPositionWS, -1500, 800)
+    distance = _binary(material, unreal.MaterialExpressionDistance, -1300, 800, position, camera)
+    ratio = _binary(material, unreal.MaterialExpressionDivide, -1150, 800, distance,
+                    _scalar(material, "OutlineReferenceDistance", 500.0, -1300, 920, 50.0, 5000.0))
+    scale = _expression(material, unreal.MaterialExpressionClamp, -950, 800)
+    # Clamp's value input is unnamed (reported as "None"); an empty name selects it.
+    if not LIB.connect_material_expressions(ratio, "", scale, ""):
+        raise RuntimeError("Failed to connect the outline distance scale to Clamp.")
+    scale.set_editor_property("min_default", 0.5)
+    scale.set_editor_property("max_default", 4.0)
+
+    width = _scalar(material, "OutlineWidth", 0.2, -950, 650, 0.0, 5.0)
+    offset = _binary(material, unreal.MaterialExpressionMultiply, -750, 500, direction, width)
+    # Also push the hull away from the camera. Without it, back faces of layered interior geometry
+    # (VRoid mouth/jaw layers a millimetre under the skin) poke through as dark patches; silhouette
+    # lines are unaffected because nothing sits right behind them.
+    # CameraVector is pixel-shader only; build the direction from positions for WPO.
+    toward_camera = _expression(material, unreal.MaterialExpressionNormalize, -950, 1000)
+    _connect(_binary(material, unreal.MaterialExpressionSubtract, -1150, 1000, camera, position),
+             toward_camera, "VectorInput")
+    bias = _binary(material, unreal.MaterialExpressionMultiply, -750, 1000, toward_camera,
+                   _scalar(material, "OutlineDepthBias", 1.0, -950, 1100, 0.0, 10.0))
+    offset = _binary(material, unreal.MaterialExpressionSubtract, -650, 600, offset, bias)
+    offset = _binary(material, unreal.MaterialExpressionMultiply, -500, 600, offset, scale)
+    _output(offset, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     _recompile(material, path)
 
 
@@ -235,6 +280,7 @@ def ensure_style_library(root: str = "/Game/MinToon/Style") -> dict:
     for name, part in PARTS.items():
         instance = _new_instance(paths[f"MI_Outline_{name}"], outline)
         LIB.set_material_instance_scalar_parameter_value(instance, "OutlineWidth", part.outline_width)
+        LIB.set_material_instance_scalar_parameter_value(instance, "OutlineFromPivot", part.outline_from_pivot)
         LIB.update_material_instance(instance)
         created[f"MI_Outline_{name}"] = instance
 

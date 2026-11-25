@@ -77,6 +77,8 @@ def create_vrm_scene(vrm_path: str):
             raise RuntimeError(f"Could not assign /Engine/BasicShapes/{shape} to {label}.")
         actor.set_actor_scale3d(unreal.Vector(*scale))
         for instance in stylize_actor(actor, STYLE_ROOT, outline=label not in ("Ground", "Path")):
+            if instance.get_name().endswith("_Outline"):
+                continue
             LIB.set_material_instance_vector_parameter_value(instance, "BaseColor", unreal.LinearColor(*tint, 1.0))
             LIB.update_material_instance(instance)
             unreal.EditorAssetLibrary.save_loaded_asset(instance, only_if_is_dirty=False)
