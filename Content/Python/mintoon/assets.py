@@ -94,6 +94,8 @@ def _build_toon_material(material, path: str, profile, *, base_color, roughness,
                          anisotropy, rim_strength) -> None:
     """Toon BSDF with albedo texture x tint, rim light and alpha for masked instances."""
     material.set_editor_property("used_with_skeletal_mesh", True)
+    # Without this usage flag the skinned vertex factory ignores morph targets (VRM expressions).
+    material.set_editor_property("used_with_morph_targets", True)
     toon = _expression(material, unreal.MaterialExpressionSubstrateToonBSDF, -150, 0)
     toon.set_editor_property("toon_profile", profile)
 
@@ -129,6 +131,8 @@ def _build_toon_material(material, path: str, profile, *, base_color, roughness,
 def _build_outline_material(material, path: str) -> None:
     """Inverted hull for MeshComponent overlay: back faces pushed out along the normal."""
     material.set_editor_property("used_with_skeletal_mesh", True)
+    # Without this usage flag the skinned vertex factory ignores morph targets (VRM expressions).
+    material.set_editor_property("used_with_morph_targets", True)
     material.set_editor_property("two_sided", True)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
     unlit = _expression(material, unreal.MaterialExpressionSubstrateUnlitBSDF, -150, 0)

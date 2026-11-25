@@ -70,6 +70,8 @@ class NativeAssetTests(unittest.TestCase):
                     library[f"MI_Outline_{name}"], parameter)
                 self.assertAlmostEqual(actual, value, places=5, msg=f"{name} {parameter}")
         self.assertEqual(library["Outline"].get_editor_property("blend_mode"), unreal.BlendMode.BLEND_MASKED)
+        for key in ("Outline", *(f"M_{name}" for name in PARTS)):
+            self.assertTrue(library[key].get_editor_property("used_with_morph_targets"), key)
         # Second call loads the same set instead of creating or overwriting.
         self.assertEqual(ensure_style_library(ROOT + "/Style")["M_Body"], library["M_Body"])
 

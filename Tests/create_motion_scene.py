@@ -23,6 +23,14 @@ FPS = 24
 CLIPS = (("Anims/Unarmed/MM_Idle", 2.0), ("Anims/Unarmed/Attack/MM_Attack_01", 2.0),
          ("Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd", 4.0))
 TARGET = unreal.Vector(0, 0, 130)
+# Facial expression curves (VRoid morph target names, seconds -> weight) added to each clip so the
+# render also covers blinking, open mouths and full-face expressions. Missing morphs are skipped.
+EXPRESSIONS = {
+    "MM_Idle": {"Fcl_EYE_Close": ((0, 0), (0.5, 0), (0.6, 1), (0.7, 0), (1.5, 0), (1.6, 1), (1.7, 0))},
+    "MM_Attack_01": {"Fcl_ALL_Angry": ((0, 0), (0.4, 1), (1.6, 1), (2.0, 0))},
+    "MF_Unarmed_Jog_Fwd": {"Fcl_ALL_Joy": ((0, 0), (0.5, 1), (4.0, 1)),
+                           "Fcl_MTH_A": ((0, 0), (1.0, 0), (1.3, 1), (1.8, 0.2), (2.3, 1), (2.8, 0), (4.0, 0))},
+}
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 
@@ -72,11 +80,26 @@ def _retarget(source_mesh, target_mesh):
         if isinstance(asset, unreal.AnimSequence):
             anims[str(data.asset_name)] = asset
             unreal.EditorAssetLibrary.save_loaded_asset(asset, only_if_is_dirty=False)
+    morphs = {str(name) for name in target_mesh.get_all_morph_target_names()}
+    skeleton = target_mesh.get_editor_property("skeleton")
+    # An animation curve only drives a morph target when the skeleton's curve metadata says so.
+    for curve in {name for keys in EXPRESSIONS.values() for name in keys} & morphs:
+        skeleton.add_curve_meta_data(curve)
+        skeleton.set_curve_meta_data_morph_target(curve, True)
+    unreal.EditorAssetLibrary.save_loaded_asset(skeleton, only_if_is_dirty=False)
     ordered = []
     for path, seconds in CLIPS:
-        name = "VRM_" + path.rsplit("/", 1)[-1]
+        clip = path.rsplit("/", 1)[-1]
+        name = "VRM_" + clip
         if name not in anims:
             raise RuntimeError(f"Retargeting did not produce {name}; got {sorted(anims)}.")
+        for curve, keys in EXPRESSIONS.get(clip, {}).items():
+            if curve not in morphs:
+                unreal.log_warning(f"MinToon: {target_mesh.get_name()} has no morph target {curve}; skipped.")
+                continue
+            unreal.AnimationLibrary.add_curve(anims[name], curve, unreal.RawCurveTrackTypes.RCT_FLOAT, False)
+            unreal.AnimationLibrary.add_float_curve_keys(anims[name], curve, [t for t, _ in keys], [v for _, v in keys])
+        unreal.EditorAssetLibrary.save_loaded_asset(anims[name], only_if_is_dirty=False)
         ordered.append((anims[name], seconds))
     return ordered
 
@@ -170,6 +193,15 @@ def create_motion_scene():
     cut.set_range(0, total)
     cut.set_camera_binding_id(sequence.get_binding_id(camera_binding))
     unreal.EditorAssetLibrary.save_loaded_asset(sequence, only_if_is_dirty=False)
+
+    # Loop the sequence when the map runs as a game (packaged check); MRQ drives its own player.
+    player = actors.spawn_actor_from_class(unreal.LevelSequenceActor, unreal.Vector(0, 0, 0))
+    player.set_actor_label("Motion Sequence")
+    player.set_sequence(sequence)
+    playback = player.get_editor_property("playback_settings")
+    playback.set_editor_property("auto_play", True)
+    playback.set_editor_property("loop_count", unreal.MovieSceneSequenceLoopCount(value=-1))
+    player.set_editor_property("playback_settings", playback)
 
     _render_config()
     if not levels.save_current_level():
